@@ -98,12 +98,12 @@ def run_episode():
     step_num      = 0
 
     # ── [START] ──────────────────────────────────────────────────────────────
-    print(json.dumps({
-        "event":     "START",
+    print("[START] " + json.dumps({
+        "task":      MODEL_NAME,
         "model":     MODEL_NAME,
         "env":       "DataCleaningEnv",
         "timestamp": episode_start,
-    }))
+    }), flush=True)
 
     obs      = env_reset()
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -121,13 +121,12 @@ def run_episode():
             raw_response = call_llm(messages)
             action       = parse_action(raw_response)
         except Exception as e:
-            print(json.dumps({
-                "event":   "STEP",
+            print("[STEP] " + json.dumps({
                 "step":    step_num,
                 "task_id": obs.get("task_id"),
                 "error":   str(e),
                 "reward":  0.0,
-            }))
+            }), flush=True)
 
         messages.append({"role": "assistant", "content": raw_response})
 
@@ -139,8 +138,7 @@ def run_episode():
         total_reward += reward
 
         # ── [STEP] ───────────────────────────────────────────────────────────
-        print(json.dumps({
-            "event":             "STEP",
+        print("[STEP] " + json.dumps({
             "step":              step_num,
             "task_id":           info.get("task_id"),
             "difficulty":        info.get("difficulty"),
@@ -153,7 +151,7 @@ def run_episode():
                 "rows_dropped":    len(action.get("dropped_indices") or []),
                 "operations_logged": len(action.get("operations_log", [])),
             },
-        }))
+        }), flush=True)
 
         obs = next_obs
 
@@ -165,22 +163,17 @@ def run_episode():
             })
 
     # ── [END] ─────────────────────────────────────────────────────────────────
-    print(json.dumps({
-        "event":             "END",
+    print("[END] " + json.dumps({
+        "task":              MODEL_NAME,
         "total_steps":       step_num,
         "total_reward":      round(total_reward, 3),
         "max_possible":      3.0,
-        "normalized_score":  round(total_reward / 3.0, 3),
+        "score":             round(total_reward / 3.0, 3),
         "duration_s":        round(time.time() - episode_start, 2),
-    }))
+    }), flush=True)
 
     return total_reward
 
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("DataCleaningEnv — Baseline Inference")
-    print(f"Model: {MODEL_NAME}  |  API: {API_BASE_URL}")
-    print("=" * 60)
     score = run_episode()
-    print(f"\nFinal score: {score:.3f} / 3.000")
