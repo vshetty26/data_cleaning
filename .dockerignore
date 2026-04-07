@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.git/
+.env
+outputs/
+*.md
+inference.py
+pyproject.toml
+tests/

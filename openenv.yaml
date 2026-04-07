@@ -1,0 +1,58 @@
+spec_version: 1
+
+name: data-cleaning-env
+display_name: "DataCleaningEnv — AI Data Cleaning Environment"
+description: >
+  A real-world RL environment where an agent receives dirty tabular datasets
+  and must return cleaned versions. Three tasks of increasing difficulty cover
+  deduplication, phone normalisation, missing-value imputation, type coercion,
+  string standardisation, outlier handling, date normalisation, unit conversion,
+  and referential integrity enforcement.
+
+type: step_reset
+
+tags:
+  - openenv
+  - data-cleaning
+  - data-engineering
+  - tabular-data
+  - real-world
+
+runtime:
+  language: python
+  python_version: "3.11"
+
+app:
+  framework: fastapi
+  entry: server/app.py
+  port: 7860
+
+tasks:
+  - id: task_001
+    name: "Deduplicate & Standardise Phone Numbers"
+    difficulty: easy
+    max_reward: 1.0
+
+  - id: task_002
+    name: "Fix Missing Values, Types & Inconsistent Strings"
+    difficulty: medium
+    max_reward: 1.0
+
+  - id: task_003
+    name: "Multi-Issue: Outliers, Dates, Units & Integrity"
+    difficulty: hard
+    max_reward: 1.0
+
+reward:
+  range: [0.0, 1.0]
+  type: partial_progress
+  episode_total: 3.0
+
+endpoints:
+  reset: POST /reset
+  step:  POST /step
+  state: GET  /state
+
+authors:
+  - name: "Vamshi Shetty"
+    email: "2024.vamshis@isu.ac.in"
