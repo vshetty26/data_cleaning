@@ -1,3 +1,13 @@
+---
+title: DataCleaningEnv
+emoji: 🤖
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # DataCleaningEnv 🧹
 
 **An OpenEnv environment where an AI agent cleans dirty tabular datasets across three real-world tasks.**
