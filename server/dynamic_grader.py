@@ -134,4 +134,10 @@ def grade_dynamic_task(task: Dict[str, Any], action_dict: Dict[str, Any]) -> Tup
                         f"(+{col_score:.2f}/{per_col:.2f})"
                     )
 
-    return round(min(score, 1.0), 2), "\n".join(feedback_parts)
+    final = round(min(score, 1.0), 4)
+    # Clamp to strictly (0, 1) — validators reject exact 0.0 and 1.0
+    if final <= 0.0:
+        final = 0.01
+    elif final >= 1.0:
+        final = 0.99
+    return final, "\n".join(feedback_parts)

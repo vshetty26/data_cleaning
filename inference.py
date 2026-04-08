@@ -28,6 +28,9 @@ MODEL_NAME   = os.environ.get("MODEL_NAME",   "gpt-4o-mini")
 HF_TOKEN     = os.environ.get("HF_TOKEN",     "")
 ENV_BASE_URL = os.environ.get("ENV_BASE_URL",  "http://localhost:7860")
 
+TASK_NAME  = "data-cleaning"
+BENCHMARK  = "DataCleaningEnv"
+
 client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
 
 # ── Environment helpers ───────────────────────────────────────────────────────
@@ -90,90 +93,90 @@ def parse_action(raw: str) -> dict:
         clean = "\n".join(lines[1:-1]) if len(lines) > 2 else clean
     return json.loads(clean)
 
+def _clamp(score: float) -> float:
+    """Clamp score to strictly (0, 1) — validator rejects exact 0.0 and 1.0."""
+    s = round(score, 4)
+    if s <= 0.0:
+        return 0.01
+    if s >= 1.0:
+        return 0.99
+    return s
+
 # ── Main episode loop ─────────────────────────────────────────────────────────
 
 def run_episode():
-    episode_start = time.time()
-    total_reward  = 0.0
-    step_num      = 0
+    step_num     = 0
+    total_reward = 0.0
+    step_rewards = []
+    last_error   = "null"
 
     # ── [START] ──────────────────────────────────────────────────────────────
-    print("[START] " + json.dumps({
-        "task":      MODEL_NAME,
-        "model":     MODEL_NAME,
-        "env":       "DataCleaningEnv",
-        "timestamp": episode_start,
-    }), flush=True)
+    print(f"[START] task={TASK_NAME} env={BENCHMARK} model={MODEL_NAME}", flush=True)
 
     obs      = env_reset()
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    while not obs.get("done", False):
-        step_num += 1
-        step_start = time.time()
+    try:
+        while not obs.get("done", False):
+            step_num  += 1
+            last_error = "null"
 
-        user_msg = build_user_message(obs)
-        messages.append({"role": "user", "content": user_msg})
+            user_msg = build_user_message(obs)
+            messages.append({"role": "user", "content": user_msg})
 
-        raw_response = ""
-        action = {"cleaned_rows": [], "operations_log": [], "dropped_indices": []}
-        try:
-            raw_response = call_llm(messages)
-            action       = parse_action(raw_response)
-        except Exception as e:
-            print("[STEP] " + json.dumps({
-                "step":    step_num,
-                "task_id": obs.get("task_id"),
-                "error":   str(e),
-                "reward":  0.0,
-            }), flush=True)
+            raw_response = ""
+            action = {"cleaned_rows": [], "operations_log": [], "dropped_indices": []}
+            try:
+                raw_response = call_llm(messages)
+                action       = parse_action(raw_response)
+            except Exception as e:
+                last_error = str(e).replace("\n", " ")
 
-        messages.append({"role": "assistant", "content": raw_response})
+            messages.append({"role": "assistant", "content": raw_response})
 
-        result    = env_step(action)
-        reward    = result["reward"]
-        done      = result["done"]
-        info      = result["info"]
-        next_obs  = result["observation"]
-        total_reward += reward
+            result   = env_step(action)
+            reward   = result["reward"]
+            done     = result["done"]
+            next_obs = result["observation"]
 
-        # ── [STEP] ───────────────────────────────────────────────────────────
-        print("[STEP] " + json.dumps({
-            "step":              step_num,
-            "task_id":           info.get("task_id"),
-            "difficulty":        info.get("difficulty"),
-            "reward":            reward,
-            "cumulative_reward": total_reward,
-            "done":              done,
-            "duration_s":        round(time.time() - step_start, 2),
-            "action_summary": {
-                "rows_returned":   len(action.get("cleaned_rows", [])),
-                "rows_dropped":    len(action.get("dropped_indices") or []),
-                "operations_logged": len(action.get("operations_log", [])),
-            },
-        }), flush=True)
+            total_reward += reward
+            step_rewards.append(reward)
 
-        obs = next_obs
+            action_label = obs.get("task_id", f"step{step_num}")
+            done_str     = "true" if done else "false"
 
-        # Feed grader feedback back into context
-        if obs.get("feedback"):
-            messages.append({
-                "role":    "user",
-                "content": f"[Grader feedback from previous task]\n{obs['feedback']}",
-            })
+            # ── [STEP] ───────────────────────────────────────────────────────
+            print(
+                f"[STEP] step={step_num} action={action_label} "
+                f"reward={reward:.2f} done={done_str} error={last_error}",
+                flush=True,
+            )
+
+            obs = next_obs
+
+            # Feed grader feedback back into context
+            if obs.get("feedback"):
+                messages.append({
+                    "role":    "user",
+                    "content": f"[Grader feedback from previous task]\n{obs['feedback']}",
+                })
+
+    except Exception as e:
+        last_error = str(e).replace("\n", " ")
 
     # ── [END] ─────────────────────────────────────────────────────────────────
-    print("[END] " + json.dumps({
-        "task":              MODEL_NAME,
-        "total_steps":       step_num,
-        "total_reward":      round(total_reward, 3),
-        "max_possible":      3.0,
-        "score":             round(total_reward / 3.0, 3),
-        "duration_s":        round(time.time() - episode_start, 2),
-    }), flush=True)
+    final_score  = _clamp(total_reward / 3.0)
+    rewards_str  = ",".join(f"{r:.2f}" for r in step_rewards)
+    success_str  = "true" if total_reward > 0 else "false"
+
+    print(
+        f"[END] success={success_str} steps={step_num} "
+        f"score={final_score:.2f} rewards={rewards_str}",
+        flush=True,
+    )
 
     return total_reward
 
 
 if __name__ == "__main__":
-    score = run_episode()
+    run_episode()

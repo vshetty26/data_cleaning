@@ -2,7 +2,7 @@
 Data Cleaning Environment — Task Bank & Graders
 
 Three tasks (easy → medium → hard) each with a deterministic grader
-that returns a score in [0.0, 1.0].
+that returns a score in (0.0, 1.0) — strictly between 0 and 1.
 
 Task themes:
   task_001 (easy)   — Remove duplicates + standardise a phone number column
@@ -177,6 +177,16 @@ def _rows_by_id(rows: List[Dict[str, Any]], id_col: str) -> Dict[Any, Dict]:
     return {r[id_col]: r for r in rows if id_col in r}
 
 
+def _clamp_score(score: float) -> float:
+    """Clamp score to strictly (0, 1) — validators reject exact 0.0 and 1.0."""
+    s = round(min(score, 1.0), 4)
+    if s <= 0.0:
+        return 0.01
+    if s >= 1.0:
+        return 0.99
+    return s
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # GRADERS
 # ──────────────────────────────────────────────────────────────────────────────
@@ -212,7 +222,7 @@ def grade_task_001(action_dict: Dict[str, Any]) -> Tuple[float, str]:
     else:
         feedback.append(f"⚠️  {correct_phones}/{len(task['expected_phones'])} phones correct (+{phone_score})")
 
-    return round(min(score, 1.0), 2), "\n".join(feedback)
+    return _clamp_score(score), "\n".join(feedback)
 
 
 def grade_task_002(action_dict: Dict[str, Any]) -> Tuple[float, str]:
@@ -278,7 +288,7 @@ def grade_task_002(action_dict: Dict[str, Any]) -> Tuple[float, str]:
     else:
         feedback.append(f"⚠️  {active_correct}/{len(task['expected_active'])} 'active' values correct (+{act_score})")
 
-    return round(min(score, 1.0), 2), "\n".join(feedback)
+    return _clamp_score(score), "\n".join(feedback)
 
 
 def grade_task_003(action_dict: Dict[str, Any]) -> Tuple[float, str]:
@@ -367,7 +377,7 @@ def grade_task_003(action_dict: Dict[str, Any]) -> Tuple[float, str]:
     else:
         feedback.append(f"⚠️  {weight_ok}/{len(task['expected_weights_kg'])} weights correct (+{weight_score})")
 
-    return round(min(score, 1.0), 2), "\n".join(feedback)
+    return _clamp_score(score), "\n".join(feedback)
 
 
 GRADERS = {
